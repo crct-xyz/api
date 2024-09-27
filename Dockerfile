@@ -1,19 +1,21 @@
-FROM python:3-slim
+FROM python:3-slim AS builder
 
 WORKDIR /app
 
-# Install dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the FastAPI app
 COPY . .
 
-# Load .env file
-ENV $(cat .env| xargs)
+FROM nginx:latest
 
-# Expose the port and run the app
-EXPOSE 8000
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+RUN mkdir /etc/nginx/ssl
+
+COPY --from=builder /app /app
+
+EXPOSE 443
+
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port 8000 & nginx -g 'daemon off;'"]
 
