@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.routes import (
     users,
     telegram,
+    triggers,
     preferences,
     notifications,
     actions,
@@ -22,4 +23,7 @@ api_router.include_router(actions.router, prefix="/actions", tags=["actions"])
 api_router.include_router(
     action_types.router, prefix="/action_types", tags=["action_types"]
 )
-api_router.include_router(telegram.router, prefix="/telegram", tags=["telegram"])
+api_router.include_router(
+    telegram.router, prefix="/telegram", tags=["telegram"])
+api_router.include_router(
+    triggers.router, prefix="/triggers", tags=["triggers"])
