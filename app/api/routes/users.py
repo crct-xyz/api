@@ -26,9 +26,8 @@ router = APIRouter()
 
 
 class User(BaseModel):
-    user_id: str
-    wallet_name: str
     wallet_public_key: str
+    is_registered: bool
 
 
 # GET endpoint to retrieve all users
@@ -51,9 +50,6 @@ def list_users():
 
 
 # POST endpoint to add a new user
-
-
-# POST endpoint to add a new user
 @router.post("/", response_model=User)
 async def create_user(user: User, request: Request):
     logger.info(f"Received POST request to create user: {user}")
@@ -63,20 +59,19 @@ async def create_user(user: User, request: Request):
         logger.debug(f"Request body: {body}")
 
         # Log the type and value of user_id
-        logger.debug(f"user.user_id type: {type(user.user_id)}")
-        logger.debug(f"user.user_id value: {user.user_id}")
+        logger.debug(f"user.user_id type: {type(user.wallet_public_key)}")
+        logger.debug(f"user.user_id value: {user.wallet_public_key}")
 
         # Prepare the item to insert into DynamoDB
         item = {
-            "user_id": user.user_id,
-            "wallet_name": user.wallet_name,
             "wallet_public_key": user.wallet_public_key,
+            "is_registered": user.is_registered,
         }
         logger.debug(f"Item to be inserted into DynamoDB: {item}")
 
         # Perform the PutItem operation
         users_table.put_item(Item=item)
-        logger.info(f"User {user.user_id} added successfully")
+        logger.info(f"User {user.wallet_public_key} added successfully")
         return user
     except ClientError as e:
         logger.error(f"ClientError during put_item: {e}")
