@@ -26,9 +26,9 @@ router = APIRouter()
 
 
 class User(BaseModel):
-    user_id: int
-    wallet_type: str
-    wallet: str
+    user_id: str
+    wallet_name: str
+    wallet_public_key: str
 
 
 # GET endpoint to retrieve all users
@@ -69,8 +69,8 @@ async def create_user(user: User, request: Request):
         # Prepare the item to insert into DynamoDB
         item = {
             "user_id": user.user_id,
-            "wallet_type": user.wallet_type,
-            "wallet": user.wallet,
+            "wallet_name": user.wallet_name,
+            "wallet_public_key": user.wallet_public_key,
         }
         logger.debug(f"Item to be inserted into DynamoDB: {item}")
 
