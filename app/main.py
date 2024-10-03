@@ -1,6 +1,21 @@
 import logging
 from fastapi import FastAPI
 from app.api.main import api_router
+from fastapi.middleware.cors import CORSMiddleware
+
+app = FastAPI(
+    title="Squint-API",
+)
+
+origins = ["*"]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Configure logging
 logging.basicConfig(
@@ -8,9 +23,5 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
-
-app = FastAPI(
-    title="Squint-API",
-)
 
 app.include_router(api_router)
