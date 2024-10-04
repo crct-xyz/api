@@ -47,7 +47,7 @@ def get_user_preferences(user_id: str) -> Optional[dict]:
 # Simulate foreign key enforcement: Check if user exists
 def check_user_exists(user_id: str):
     try:
-        response = users_table.get_item(Key={"user_id": user_id})
+        response = users_table.get_item(Key={"wallet_public_key": user_id})
         if "Item" not in response:
             raise HTTPException(status_code=404, detail="User does not exist")
     except ClientError as e:
@@ -95,7 +95,7 @@ def create_user_preferences(preferences: Preferences):
 
         preferences_table.put_item(
             Item={
-                "user_id": preferences.user_id,  # Ensure this is an integer
+                "user_id": preferences.user_id,
                 "telegram_user": preferences.telegram_user,
                 "email": preferences.email,
             }
