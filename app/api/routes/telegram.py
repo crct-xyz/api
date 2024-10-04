@@ -61,3 +61,25 @@ def list_telegram_sessions():
         raise HTTPException(
             status_code=500, detail=f"Failed to list sessions: {str(e)}"
         )
+
+
+@router.delete("/{telegram_user}", response_model=Dict[str, str])
+def delete_telegram_session(telegram_user: str):
+    try:
+        # Check if the session exists
+        response = telegram_sessions_table.get_item(
+            Key={"telegram_user": telegram_user}
+        )
+        if not response.get("Item"):
+            raise HTTPException(
+                status_code=404, detail=f"Session not found for user: {telegram_user}"
+            )
+
+        # Delete the session
+        telegram_sessions_table.delete_item(
+            Key={"telegram_user": telegram_user})
+        return {"message": f"Session for user {telegram_user} deleted successfully"}
+    except ClientError as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to delete session: {str(e)}"
+        )

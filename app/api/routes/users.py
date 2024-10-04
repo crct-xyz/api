@@ -133,3 +133,31 @@ async def check_wallet_registration(wallet_public_key: str):
         logger.exception(f"Unexpected error during get_item: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
+
+@router.delete("/{wallet_public_key}", response_model=Dict[str, str])
+async def delete_user(wallet_public_key: str):
+    logger.info(f"Received DELETE request for wallet: {wallet_public_key}")
+    try:
+        # Check if the user exists
+        response = users_table.get_item(
+            Key={"wallet_public_key": wallet_public_key})
+        user = response.get("Item")
+
+        if user:
+            # Delete the user
+            users_table.delete_item(
+                Key={"wallet_public_key": wallet_public_key})
+            logger.info(f"User {wallet_public_key} deleted successfully")
+            return {"message": f"User {wallet_public_key} deleted successfully"}
+        else:
+            logger.warning(f"User {wallet_public_key} not found")
+            raise HTTPException(status_code=404, detail="User not found")
+
+    except ClientError as e:
+        logger.error(f"ClientError during delete_item: {e}")
+        raise HTTPException(
+            status_code=500, detail="Failed to delete user from the database"
+        )
+    except Exception as e:
+        logger.exception(f"Unexpected error during delete_item: {e}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
