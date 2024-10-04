@@ -8,6 +8,7 @@ from app.api.routes import (
     notifications,
     actions,
     action_types,
+    orders,
 )
 
 api_router = APIRouter()
@@ -27,3 +28,4 @@ api_router.include_router(
     telegram.router, prefix="/telegram", tags=["telegram"])
 api_router.include_router(
     triggers.router, prefix="/triggers", tags=["triggers"])
+api_router.include_router(orders.router, prefix="/orders", tags=["orders"])
