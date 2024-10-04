@@ -53,3 +53,24 @@ def create_action_type(action_type: ActionType):
         return action_type
     except ClientError as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# DELETE endpoint to remove an action type
+@router.delete("/{type_id}", response_model=Dict[str, str])
+def delete_action_type(type_id: int):
+    try:
+        # Check if the action type exists
+        response = actions_table.get_item(Key={"type_id": type_id})
+        if "Item" not in response:
+            raise HTTPException(
+                status_code=404, detail=f"Action type with ID {type_id} not found"
+            )
+
+        # Delete the action type
+        actions_table.delete_item(Key={"type_id": type_id})
+
+        return {"message": f"Action type with ID {type_id} deleted successfully"}
+    except ClientError as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to delete action type: {str(e)}"
+        )

@@ -104,3 +104,26 @@ def create_user_preferences(preferences: Preferences):
 
     except ClientError as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# DELETE endpoint to remove user preferences
+@router.delete("/{user_id}", response_model=dict)
+def delete_user_preferences(user_id: str):
+    """
+    Delete user preferences from the DynamoDB 'preferences' table.
+    """
+    try:
+        # Check if the preferences exist
+        existing_preferences = get_user_preferences(user_id)
+        if existing_preferences is None:
+            raise HTTPException(
+                status_code=404, detail="Preferences not found")
+
+        # Delete the preferences
+        preferences_table.delete_item(Key={"user_id": user_id})
+
+        return {"message": f"Preferences for user {user_id} deleted successfully"}
+    except ClientError as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to delete preferences: {str(e)}"
+        )
