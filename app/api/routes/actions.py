@@ -38,7 +38,7 @@ def check_user_exists(wallet_public_key: str):
 
 
 # General GET endpoint to retrieve all actions
-@router.get("/actions/", response_model=List[Action])
+@router.get("/", response_model=List[Action])
 async def list_actions():
     try:
         response = actions_table.scan()
@@ -48,7 +48,7 @@ async def list_actions():
 
 
 # POST endpoint to add a new action with foreign key enforcement
-@router.post("/actions/", response_model=Action)
+@router.post("/", response_model=Action)
 async def create_action(action: Action):
     # Simulate foreign key enforcement
     check_user_exists(
@@ -68,7 +68,7 @@ async def create_action(action: Action):
 
 
 # GET endpoint to retrieve a specific action
-@router.get("/actions/{action_id}", response_model=Action)
+@router.get("/{action_id}", response_model=Action)
 async def get_action(action_id: int):
     try:
         response = actions_table.get_item(Key={"action_id": action_id})
@@ -80,7 +80,7 @@ async def get_action(action_id: int):
 
 
 # PUT endpoint to update an existing action
-@router.put("/actions/{action_id}", response_model=Action)
+@router.put("/{action_id}", response_model=Action)
 async def update_action(action_id: int, action: Action):
     if action_id != action.action_id:
         raise HTTPException(
@@ -106,11 +106,10 @@ async def update_action(action_id: int, action: Action):
 
 
 # DELETE endpoint to remove an action
-@router.delete("/actions/{action_id}", response_model=Dict[str, str])
+@router.delete("/{action_id}", response_model=Dict[str, str])
 async def delete_action(action_id: int):
     try:
         actions_table.delete_item(Key={"action_id": action_id})
         return {"message": f"Action with action_id {action_id} has been deleted"}
     except ClientError as e:
         raise HTTPException(status_code=500, detail=str(e))
-

@@ -22,7 +22,7 @@ class ActionType(BaseModel):
 
 
 # Create a new ActionType
-@router.post("/action-types/", response_model=ActionType)
+@router.post("/", response_model=ActionType)
 async def create_action_type(action_type: ActionType):
     try:
         actions_table.put_item(
@@ -40,7 +40,7 @@ async def create_action_type(action_type: ActionType):
 
 
 # Get an ActionType by type_id
-@router.get("/action-types/{type_id}", response_model=ActionType)
+@router.get("/{type_id}", response_model=ActionType)
 async def get_action_type(type_id: int):
     try:
         response = actions_table.get_item(Key={"type_id": type_id})
@@ -54,7 +54,7 @@ async def get_action_type(type_id: int):
 
 
 # Update an existing ActionType
-@router.put("/action-types/{type_id}", response_model=ActionType)
+@router.put("/{type_id}", response_model=ActionType)
 async def update_action_type(type_id: int, action_type: ActionType):
     if type_id != action_type.type_id:
         raise HTTPException(
@@ -80,7 +80,7 @@ async def update_action_type(type_id: int, action_type: ActionType):
 
 
 # Delete an ActionType
-@router.delete("/action-types/{type_id}", response_model=Dict[str, str])
+@router.delete("/{type_id}", response_model=Dict[str, str])
 async def delete_action_type(type_id: int):
     try:
         actions_table.delete_item(Key={"type_id": type_id})
@@ -92,7 +92,7 @@ async def delete_action_type(type_id: int):
 
 
 # List all ActionTypes
-@router.get("/action-types/", response_model=List[ActionType])
+@router.get("/", response_model=List[ActionType])
 async def list_action_types():
     try:
         response = actions_table.scan()
@@ -101,4 +101,3 @@ async def list_action_types():
         raise HTTPException(
             status_code=500, detail="An error occurred while retrieving ActionTypes"
         )
-
