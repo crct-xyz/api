@@ -26,8 +26,7 @@ class Action(BaseModel):
 # Function to check if the user exists (simulated foreign key enforcement)
 def check_user_exists(wallet_public_key: str):
     try:
-        response = users_table.get_item(
-            Key={"wallet_public_key": wallet_public_key})
+        response = users_table.get_item(Key={"wallet_public_key": wallet_public_key})
         if "Item" not in response:
             raise HTTPException(
                 status_code=404,
@@ -67,14 +66,20 @@ async def create_action(action: Action):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# GET endpoint to retrieve a specific action
-@router.get("/{action_id}", response_model=Action)
-async def get_action(action_id: int):
+# GET specific action
+
+
+@router.get("/{action_id}", response_model=Dict)
+async def get_action_payload(action_id: int):
     try:
         response = actions_table.get_item(Key={"action_id": action_id})
         if "Item" not in response:
             raise HTTPException(status_code=404, detail="Action not found")
-        return Action(**response["Item"])
+        action_item = response["Item"]
+        payload = action_item.get("payload")
+        if payload is None:
+            raise HTTPException(status_code=404, detail="Payload not found")
+        return payload
     except ClientError as e:
         raise HTTPException(status_code=500, detail=str(e))
 

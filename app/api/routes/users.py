@@ -4,7 +4,6 @@ import boto3
 from botocore.exceptions import ClientError
 from typing import List, Optional
 from datetime import datetime
-from uuid import uuid4
 
 # Initialize DynamoDB client
 dynamodb = boto3.resource("dynamodb", region_name="eu-central-1")
@@ -18,25 +17,25 @@ router = APIRouter()
 
 class UserBase(BaseModel):
     wallet_public_key: str = Field(..., description="User's public wallet key")
-    telegram_username: str = Field(..., description="User's unique username")
-    is_registered: bool = Field(default=True, description="User registration status")
+    telegram_username: str = Field(..., description="User's unique Telegram username")
+    # 'is_registered' is handled internally and not provided by the client
 
 
 class UserCreate(UserBase):
-    pass
+    pass  # No additional fields needed
 
 
 class User(UserBase):
+    is_registered: bool = Field(..., description="User registration status")
     created_at: str = Field(..., description="Timestamp of user creation")
     updated_at: str = Field(..., description="Timestamp of last user update")
 
 
 class UserUpdate(BaseModel):
-    wallet_public_key: Optional[str] = Field(
-        None, description="User's public wallet key"
+    telegram_username: Optional[str] = Field(
+        None, description="User's unique Telegram username"
     )
-    telegram_username: Optional[str] = Field(None, description="User's unique username")
-    is_registered: Optional[bool] = Field(None, description="User registration status")
+    # 'wallet_public_key' and 'is_registered' should not be updatable by the client
 
 
 def get_users_table():
@@ -44,17 +43,21 @@ def get_users_table():
 
 
 # Helper function to format user data
+
+
 def format_user(user):
     return {
         "wallet_public_key": user["wallet_public_key"],
         "telegram_username": user.get("telegram_username"),
         "is_registered": user.get("is_registered", False),
-        "created_at": user["created_at"],
-        "updated_at": user["updated_at"],
+        "created_at": user.get("created_at"),
+        "updated_at": user.get("updated_at"),
     }
 
 
-# Create a new user
+# Create or update a user
+
+
 @router.post("/", response_model=User, status_code=201)
 async def create_or_update_user(user_input: UserCreate, table=Depends(get_users_table)):
     try:
@@ -68,12 +71,13 @@ async def create_or_update_user(user_input: UserCreate, table=Depends(get_users_
             # User exists
             is_registered = existing_user.get("is_registered", False)
             if not is_registered:
-                # Update is_registered to True
+                # Update is_registered to True and update telegram_username
                 table.update_item(
                     Key={"wallet_public_key": user_input.wallet_public_key},
-                    UpdateExpression="SET is_registered = :is_registered, updated_at = :updated_at",
+                    UpdateExpression="SET is_registered = :is_registered, telegram_username = :telegram_username, updated_at = :updated_at",
                     ExpressionAttributeValues={
                         ":is_registered": True,
+                        ":telegram_username": user_input.telegram_username,
                         ":updated_at": datetime.utcnow().isoformat(),
                     },
                 )
@@ -84,12 +88,31 @@ async def create_or_update_user(user_input: UserCreate, table=Depends(get_users_
                 updated_user = response.get("Item")
                 return format_user(updated_user)
             else:
-                # User is already registered
-                return format_user(existing_user)
+                # User is already registered, update telegram_username if changed
+                if (
+                    existing_user.get("telegram_username")
+                    != user_input.telegram_username
+                ):
+                    table.update_item(
+                        Key={"wallet_public_key": user_input.wallet_public_key},
+                        UpdateExpression="SET telegram_username = :telegram_username, updated_at = :updated_at",
+                        ExpressionAttributeValues={
+                            ":telegram_username": user_input.telegram_username,
+                            ":updated_at": datetime.utcnow().isoformat(),
+                        },
+                    )
+                    response = table.get_item(
+                        Key={"wallet_public_key": user_input.wallet_public_key}
+                    )
+                    updated_user = response.get("Item")
+                    return format_user(updated_user)
+                else:
+                    return format_user(existing_user)
         else:
             # User does not exist, create new user
             new_user = {
                 "wallet_public_key": user_input.wallet_public_key,
+                "telegram_username": user_input.telegram_username,
                 "is_registered": True,
                 "created_at": datetime.utcnow().isoformat(),
                 "updated_at": datetime.utcnow().isoformat(),
@@ -104,8 +127,10 @@ async def create_or_update_user(user_input: UserCreate, table=Depends(get_users_
 
 
 # Get all users
+
+
 @router.get("/", response_model=List[User])
-async def get_users(table: dynamodb.Table = Depends(get_users_table)):
+async def get_users(table=Depends(get_users_table)):
     try:
         response = table.scan()
         users = response.get("Items", [])
@@ -116,13 +141,13 @@ async def get_users(table: dynamodb.Table = Depends(get_users_table)):
         )
 
 
-# Get a specific user by ID
+# Get a specific user by wallet_public_key
+
+
 @router.get("/{wallet_public_key}", response_model=User)
-async def get_user(
-    wallet_public_key: str, table: dynamodb.Table = Depends(get_users_table)
-):
+async def get_user(wallet_public_key: str, table=Depends(get_users_table)):
     try:
-        response = table.get_item(Key={"id": wallet_public_key})
+        response = table.get_item(Key={"wallet_public_key": wallet_public_key})
         user = response.get("Item")
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
@@ -140,7 +165,7 @@ async def get_user(
 async def update_user(
     wallet_public_key: str,
     user_update: UserUpdate,
-    table: dynamodb.Table = Depends(get_users_table),
+    table=Depends(get_users_table),
 ):
     update_data = user_update.dict(exclude_unset=True)
     if not update_data:
@@ -155,7 +180,7 @@ async def update_user(
 
     try:
         response = table.update_item(
-            Key={"id": wallet_public_key},
+            Key={"wallet_public_key": wallet_public_key},
             UpdateExpression=update_expression,
             ExpressionAttributeNames=expression_attribute_names,
             ExpressionAttributeValues=expression_attribute_values,
@@ -173,15 +198,14 @@ async def update_user(
 
 
 @router.delete("/{wallet_public_key}", status_code=204)
-async def delete_user(
-    wallet_public_key: str, table: dynamodb.Table = Depends(get_users_table)
-):
+async def delete_user(wallet_public_key: str, table=Depends(get_users_table)):
     try:
         response = table.delete_item(
-            Key={"id": wallet_public_key}, ReturnValues="ALL_OLD"
+            Key={"wallet_public_key": wallet_public_key}, ReturnValues="ALL_OLD"
         )
         deleted_user = response.get("Attributes")
         if not deleted_user:
             raise HTTPException(status_code=404, detail="User not found")
     except ClientError as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete user: {str(e)}")
+
