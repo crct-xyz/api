@@ -18,7 +18,6 @@ class Preferences(BaseModel):
     # Each preference set will be unique to the user_id
     user_id: str
     telegram_user: str
-    email: str
 
 
 # Initialize the router
@@ -37,7 +36,6 @@ def get_user_preferences(user_id: str) -> Optional[dict]:
         return {
             "user_id": item["user_id"],
             "telegram_user": item["telegram_user"],
-            "emails": item["emails"],
         }
 
     except ClientError as e:
@@ -55,8 +53,6 @@ def check_user_exists(user_id: str):
 
 
 # GET endpoint to retrieve all user preferences
-
-
 @router.get("/", response_model=List[Preferences])
 def list_user_preferences():
     try:
@@ -97,7 +93,6 @@ def create_user_preferences(preferences: Preferences):
             Item={
                 "user_id": preferences.user_id,
                 "telegram_user": preferences.telegram_user,
-                "email": preferences.email,
             }
         )
         return preferences
@@ -116,8 +111,7 @@ def delete_user_preferences(user_id: str):
         # Check if the preferences exist
         existing_preferences = get_user_preferences(user_id)
         if existing_preferences is None:
-            raise HTTPException(
-                status_code=404, detail="Preferences not found")
+            raise HTTPException(status_code=404, detail="Preferences not found")
 
         # Delete the preferences
         preferences_table.delete_item(Key={"user_id": user_id})
