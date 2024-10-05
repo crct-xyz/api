@@ -44,41 +44,67 @@ def get_users_table():
 
 
 # Helper function to format user data
-
-
 def format_user(user):
     return {
         "wallet_public_key": user["wallet_public_key"],
-        "telegram_username": user["telegram_username"],
-        "is_registered": user["is_registered"],
+        "telegram_username": user.get("telegram_username"),
+        "is_registered": user.get("is_registered", False),
         "created_at": user["created_at"],
         "updated_at": user["updated_at"],
     }
 
 
 # Create a new user
-
-
-@router.post("/users", response_model=User, status_code=201)
-async def create_user(
-    user: UserCreate, table: dynamodb.Table = Depends(get_users_table)
-):
-    new_user = user.dict()
-    new_user["created_at"] = datetime.utcnow().isoformat()
-    new_user["updated_at"] = new_user["created_at"]
-
+@router.post("/", response_model=User, status_code=201)
+async def create_or_update_user(user_input: UserCreate, table=Depends(get_users_table)):
     try:
-        table.put_item(Item=new_user)
-    except ClientError as e:
-        raise HTTPException(status_code=500, detail=f"Failed to create user: {str(e)}")
+        # Check if the user already exists
+        response = table.get_item(
+            Key={"wallet_public_key": user_input.wallet_public_key}
+        )
+        existing_user = response.get("Item")
 
-    return format_user(new_user)
+        if existing_user:
+            # User exists
+            is_registered = existing_user.get("is_registered", False)
+            if not is_registered:
+                # Update is_registered to True
+                table.update_item(
+                    Key={"wallet_public_key": user_input.wallet_public_key},
+                    UpdateExpression="SET is_registered = :is_registered, updated_at = :updated_at",
+                    ExpressionAttributeValues={
+                        ":is_registered": True,
+                        ":updated_at": datetime.utcnow().isoformat(),
+                    },
+                )
+                # Retrieve the updated user
+                response = table.get_item(
+                    Key={"wallet_public_key": user_input.wallet_public_key}
+                )
+                updated_user = response.get("Item")
+                return format_user(updated_user)
+            else:
+                # User is already registered
+                return format_user(existing_user)
+        else:
+            # User does not exist, create new user
+            new_user = {
+                "wallet_public_key": user_input.wallet_public_key,
+                "is_registered": True,
+                "created_at": datetime.utcnow().isoformat(),
+                "updated_at": datetime.utcnow().isoformat(),
+            }
+            table.put_item(Item=new_user)
+            return format_user(new_user)
+
+    except ClientError as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to create or update user: {str(e)}"
+        )
 
 
 # Get all users
-
-
-@router.get("/users", response_model=List[User])
+@router.get("/", response_model=List[User])
 async def get_users(table: dynamodb.Table = Depends(get_users_table)):
     try:
         response = table.scan()
@@ -91,12 +117,12 @@ async def get_users(table: dynamodb.Table = Depends(get_users_table)):
 
 
 # Get a specific user by ID
-
-
-@router.get("/users/{user_id}", response_model=User)
-async def get_user(user_id: str, table: dynamodb.Table = Depends(get_users_table)):
+@router.get("/{wallet_public_key}", response_model=User)
+async def get_user(
+    wallet_public_key: str, table: dynamodb.Table = Depends(get_users_table)
+):
     try:
-        response = table.get_item(Key={"id": user_id})
+        response = table.get_item(Key={"id": wallet_public_key})
         user = response.get("Item")
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
@@ -110,9 +136,9 @@ async def get_user(user_id: str, table: dynamodb.Table = Depends(get_users_table
 # Update a user
 
 
-@router.put("/users/{user_id}", response_model=User)
+@router.put("/{wallet_public_key}", response_model=User)
 async def update_user(
-    user_id: str,
+    wallet_public_key: str,
     user_update: UserUpdate,
     table: dynamodb.Table = Depends(get_users_table),
 ):
@@ -129,7 +155,7 @@ async def update_user(
 
     try:
         response = table.update_item(
-            Key={"id": user_id},
+            Key={"id": wallet_public_key},
             UpdateExpression=update_expression,
             ExpressionAttributeNames=expression_attribute_names,
             ExpressionAttributeValues=expression_attribute_values,
@@ -146,10 +172,14 @@ async def update_user(
 # Delete a user
 
 
-@router.delete("/users/{user_id}", status_code=204)
-async def delete_user(user_id: str, table: dynamodb.Table = Depends(get_users_table)):
+@router.delete("/{wallet_public_key}", status_code=204)
+async def delete_user(
+    wallet_public_key: str, table: dynamodb.Table = Depends(get_users_table)
+):
     try:
-        response = table.delete_item(Key={"id": user_id}, ReturnValues="ALL_OLD")
+        response = table.delete_item(
+            Key={"id": wallet_public_key}, ReturnValues="ALL_OLD"
+        )
         deleted_user = response.get("Attributes")
         if not deleted_user:
             raise HTTPException(status_code=404, detail="User not found")
