@@ -5,56 +5,112 @@ from botocore.exceptions import ClientError
 from typing import List, Dict, Optional
 
 # Initialize DynamoDB client
-dynamodb = boto3.resource('dynamodb', region_name='eu-central-1')  # Replace with your AWS region
-actions_table = dynamodb.Table('actions')
-users_table = dynamodb.Table('users')  # Reference to enforce the foreign key constraint
+dynamodb = boto3.resource("dynamodb", region_name="eu-central-1")
+actions_table = dynamodb.Table("actions")
+users_table = dynamodb.Table("users")
 
 # Initialize the router
 router = APIRouter()
 
+
 # Define the data model for Actions using Pydantic
 class Action(BaseModel):
     action_id: int
-    action_json: str
     action_type_id: int
-    user_id: int
+    user_id: (
+        str  # This is the wallet_public_key, but stored as user_id in actions table
+    )
+    payload: Dict
+
 
 # Function to check if the user exists (simulated foreign key enforcement)
-def check_user_exists(user_id: int):
+def check_user_exists(wallet_public_key: str):
     try:
-        response = users_table.get_item(Key={"user_id": user_id})
-        if 'Item' not in response:
-            raise HTTPException(status_code=404, detail=f"User with user_id {user_id} does not exist")
+        response = users_table.get_item(
+            Key={"wallet_public_key": wallet_public_key})
+        if "Item" not in response:
+            raise HTTPException(
+                status_code=404,
+                detail=f"User with wallet_public_key {wallet_public_key} does not exist",
+            )
     except ClientError as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 # General GET endpoint to retrieve all actions
-@router.get("/", response_model=List[Dict])
-def list_actions():
+@router.get("/actions/", response_model=List[Action])
+async def list_actions():
     try:
         response = actions_table.scan()
-        items = response.get('Items')
-        return items
+        return response.get("Items", [])
     except ClientError as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# POST endpoint to add a new action with foreign key enforcement
-@router.post("/", response_model=Action)
-def create_action(action: Action):
-    # Simulate foreign key enforcement
-    check_user_exists(action.user_id)
 
+# POST endpoint to add a new action with foreign key enforcement
+@router.post("/actions/", response_model=Action)
+async def create_action(action: Action):
+    # Simulate foreign key enforcement
+    check_user_exists(
+        action.user_id
+    )  # user_id in action is actually the wallet_public_key
     try:
-        # Prepare the item to insert into DynamoDB
         actions_table.put_item(
-            Item={
-                "action_id": {"N": str(action.action_id)},
-                "action_json": {"S": action.action_json},
-                "action_type_id": {"N": str(action.action_type_id)},
-                "user_id": {"N": str(action.user_id)},
-            }
+            Item=action.dict(), ConditionExpression="attribute_not_exists(action_id)"
         )
         return action
+    except ClientError as e:
+        if e.response["Error"]["Code"] == "ConditionalCheckFailedException":
+            raise HTTPException(
+                status_code=400, detail="Action with this action_id already exists"
+            )
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# GET endpoint to retrieve a specific action
+@router.get("/actions/{action_id}", response_model=Action)
+async def get_action(action_id: int):
+    try:
+        response = actions_table.get_item(Key={"action_id": action_id})
+        if "Item" not in response:
+            raise HTTPException(status_code=404, detail="Action not found")
+        return Action(**response["Item"])
+    except ClientError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# PUT endpoint to update an existing action
+@router.put("/actions/{action_id}", response_model=Action)
+async def update_action(action_id: int, action: Action):
+    if action_id != action.action_id:
+        raise HTTPException(
+            status_code=400, detail="Path action_id does not match body action_id"
+        )
+    check_user_exists(
+        action.user_id
+    )  # user_id in action is actually the wallet_public_key
+    try:
+        response = actions_table.update_item(
+            Key={"action_id": action_id},
+            UpdateExpression="set action_type_id=:ati, user_id=:uid, payload=:p",
+            ExpressionAttributeValues={
+                ":ati": action.action_type_id,
+                ":uid": action.user_id,
+                ":p": action.payload,
+            },
+            ReturnValues="ALL_NEW",
+        )
+        return Action(**response["Attributes"])
+    except ClientError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# DELETE endpoint to remove an action
+@router.delete("/actions/{action_id}", response_model=Dict[str, str])
+async def delete_action(action_id: int):
+    try:
+        actions_table.delete_item(Key={"action_id": action_id})
+        return {"message": f"Action with action_id {action_id} has been deleted"}
     except ClientError as e:
         raise HTTPException(status_code=500, detail=str(e))
 
