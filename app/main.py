@@ -24,6 +24,9 @@ app.add_middleware(
 @app.middleware("http")
 async def add_custom_headers(request: Request, call_next):
     response = await call_next(request)
+    origin = request.headers.get("origin")
+    if origin in origins:
+        response.headers["Access-Control-Allow-Origin"] = origin
     # Add the required custom headers if not already present
     response.headers["X-Action-Version"] = "2.1.3"
     response.headers["X-Blockchain-Ids"] = (
