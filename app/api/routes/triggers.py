@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List
-from app.api.models.trigger_event import EventTrigger
+from app.api.models.trigger import EventTrigger
 from botocore.exceptions import ClientError
 import boto3
 from boto3.dynamodb.conditions import Key

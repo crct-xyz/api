@@ -3,6 +3,7 @@ from pydantic import BaseModel
 import boto3
 from botocore.exceptions import ClientError
 from typing import List, Dict, Optional
+from app.api.models.action_types import ActionType
 
 # Initialize DynamoDB client
 dynamodb = boto3.resource("dynamodb", region_name="eu-central-1")
@@ -10,15 +11,6 @@ actions_table = dynamodb.Table("action_types")
 
 # Initialize the router
 router = APIRouter()
-
-
-# Define the data model for ActionTypes using Pydantic
-class ActionType(BaseModel):
-    type_id: int
-    business_name: Optional[str] = None
-    contract_name: Optional[str] = None
-    description: Optional[str] = None
-    json: Optional[Dict] = None
 
 
 # Create a new ActionType
