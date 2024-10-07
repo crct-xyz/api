@@ -4,6 +4,7 @@ import boto3
 from botocore.exceptions import ClientError
 from typing import List, Optional
 from datetime import datetime
+from app.api.models.users import User, UserResponse, UserCreate, UserUpdate
 
 # Initialize DynamoDB client
 dynamodb = boto3.resource("dynamodb", region_name="eu-central-1")
@@ -12,48 +13,9 @@ users_table = dynamodb.Table("users")
 # Initialize the router
 router = APIRouter()
 
-# Define the data models using Pydantic
-
-
-class UserBase(BaseModel):
-    wallet_public_key: str = Field(..., description="User's public wallet key")
-    telegram_username: str = Field(...,
-                                   description="User's unique Telegram username")
-    # 'is_registered' is handled internally and not provided by the client
-
-
-class UserResponse(BaseModel):
-    wallet_public_key: Optional[str] = Field(
-        None, description="User's public wallet key"
-    )
-    telegram_username: Optional[str] = Field(
-        None, description="User's unique Telegram username"
-    )
-    is_registered: bool = Field(..., description="User registration status")
-
-
-class UserCreate(UserBase):
-    pass  # No additional fields needed
-
-
-class User(UserBase):
-    is_registered: bool = Field(..., description="User registration status")
-    created_at: str = Field(..., description="Timestamp of user creation")
-    updated_at: str = Field(..., description="Timestamp of last user update")
-
-
-class UserUpdate(BaseModel):
-    telegram_username: Optional[str] = Field(
-        None, description="User's unique Telegram username"
-    )
-    # 'wallet_public_key' and 'is_registered' should not be updatable by the client
-
 
 def get_users_table():
     return users_table
-
-
-# Helper function to format user data
 
 
 def format_user(user):
@@ -181,8 +143,7 @@ async def update_user(
     if not update_data:
         raise HTTPException(status_code=400, detail="No fields to update")
 
-    update_expression = "SET " + \
-        ", ".join(f"#{k}=:{k}" for k in update_data.keys())
+    update_expression = "SET " + ", ".join(f"#{k}=:{k}" for k in update_data.keys())
     update_expression += ", updated_at=:updated_at"
 
     expression_attribute_names = {f"#{k}": k for k in update_data.keys()}
@@ -202,8 +163,7 @@ async def update_user(
             raise HTTPException(status_code=404, detail="User not found")
         return format_user(updated_user)
     except ClientError as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to update user: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to update user: {str(e)}")
 
 
 # Delete a user
@@ -219,5 +179,4 @@ async def delete_user(wallet_public_key: str, table=Depends(get_users_table)):
         if not deleted_user:
             raise HTTPException(status_code=404, detail="User not found")
     except ClientError as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to delete user: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete user: {str(e)}")

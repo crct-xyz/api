@@ -3,6 +3,7 @@ from pydantic import BaseModel
 import boto3
 from botocore.exceptions import ClientError
 from typing import List, Dict, Optional
+from app.api.models.actions import Action
 
 # Initialize DynamoDB client
 dynamodb = boto3.resource("dynamodb", region_name="eu-central-1")
@@ -12,18 +13,9 @@ users_table = dynamodb.Table("users")
 # Initialize the router
 router = APIRouter()
 
-
-# Define the data model for Actions using Pydantic
-class Action(BaseModel):
-    action_id: int
-    action_type_id: int
-    user_id: (
-        str  # This is the wallet_public_key, but stored as user_id in actions table
-    )
-    payload: Dict
-
-
 # Function to check if the user exists (simulated foreign key enforcement)
+
+
 def check_user_exists(wallet_public_key: str):
     try:
         response = users_table.get_item(Key={"wallet_public_key": wallet_public_key})
