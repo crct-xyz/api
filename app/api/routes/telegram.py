@@ -3,6 +3,7 @@ from pydantic import BaseModel
 import boto3
 from botocore.exceptions import ClientError
 from typing import List, Dict, Optional
+from app.api.models.telegram import TelegramSession
 
 # Initialize DynamoDB client
 # Replace with your AWS region
@@ -11,11 +12,6 @@ telegram_sessions_table = dynamodb.Table("telegram_sessions")
 
 # Initialize the router
 router = APIRouter()
-
-
-class TelegramSession(BaseModel):
-    telegram_user: str
-    session_id: int
 
 
 @router.post("/", response_model=TelegramSession)
@@ -76,8 +72,7 @@ def delete_telegram_session(telegram_user: str):
             )
 
         # Delete the session
-        telegram_sessions_table.delete_item(
-            Key={"telegram_user": telegram_user})
+        telegram_sessions_table.delete_item(Key={"telegram_user": telegram_user})
         return {"message": f"Session for user {telegram_user} deleted successfully"}
     except ClientError as e:
         raise HTTPException(
