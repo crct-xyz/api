@@ -1,11 +1,9 @@
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException, Query
 import boto3
 from botocore.exceptions import ClientError
 from typing import List, Dict, Optional
 from app.api.models.actions import Action
 
-# Initialize DynamoDB client
 dynamodb = boto3.resource("dynamodb", region_name="eu-central-1")
 actions_table = dynamodb.Table("actions")
 users_table = dynamodb.Table("users")
@@ -62,17 +60,47 @@ async def create_action(action: Action):
 # GET specific action
 
 
-@router.get("/{action_id}", response_model=Dict)
-async def get_action_payload(action_id: int):
+@router.get("/", response_model=List[Action])
+async def list_actions(
+    filter_key: Optional[str] = Query(
+        None, description="Attribute to filter on"),
+    filter_value: Optional[str] = Query(
+        None, description="Value to filter by"),
+    limit: Optional[int] = Query(
+        None, description="Number of items to return"),
+    last_evaluated_key: Optional[str] = Query(
+        None, description="Last evaluated key for pagination"
+    ),
+):
     try:
-        response = actions_table.get_item(Key={"action_id": action_id})
-        if "Item" not in response:
-            raise HTTPException(status_code=404, detail="Action not found")
-        action_item = response["Item"]
-        payload = action_item.get("payload")
-        if payload is None:
-            raise HTTPException(status_code=404, detail="Payload not found")
-        return payload
+        scan_kwargs = {}
+        if filter_key and filter_value:
+            scan_kwargs["FilterExpression"] = Attr(filter_key).eq(filter_value)
+        if limit:
+            scan_kwargs["Limit"] = limit
+        if last_evaluated_key:
+            scan_kwargs["ExclusiveStartKey"] = {
+                "action_id": int(last_evaluated_key)}
+
+        response = actions_table.scan(**scan_kwargs)
+
+        items = response.get("Items", [])
+
+        # Transform items to match the Action model
+        transformed_items = []
+        for item in items:
+            transformed_item = {
+                "action_id": item["action_id"],
+                "action_type_id": item["action_type_id"],
+                "user_id": item["user_id"],
+                "transaction_index": item.get("transaction_index"),
+                "transaction_type": item.get("transaction_type"),
+                "payload": item["payload"],
+            }
+            transformed_items.append(Action(**transformed_item))
+
+        return transformed_items
+
     except ClientError as e:
         raise HTTPException(status_code=500, detail=str(e))
 
