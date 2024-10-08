@@ -1,4 +1,4 @@
-# Squint API
+# API
 
 ## Dev
 
