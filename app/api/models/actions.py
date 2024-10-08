@@ -9,5 +9,7 @@ class Action(BaseModel):
     action_id: int
     action_type_id: int
     user_id: str
+    transaction_index: int
+    transaction_type: str
+    vault_id: str
     payload: Dict
-

@@ -18,7 +18,8 @@ router = APIRouter()
 
 def check_user_exists(wallet_public_key: str):
     try:
-        response = users_table.get_item(Key={"wallet_public_key": wallet_public_key})
+        response = users_table.get_item(
+            Key={"wallet_public_key": wallet_public_key})
         if "Item" not in response:
             raise HTTPException(
                 status_code=404,
